@@ -1,32 +1,115 @@
 ---
-title: "Exercise"
+title: "Practical Machine Learning Project"
 author: "Vladimir Martinov"
 date: "6/1/2019"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+# Practical Machine Learning Project
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+## Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+## Data
+The training data for this project are available here:
 
-```{r cars}
-summary(cars)
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+
+
+## Setup
+
+```{r libs, echo=FALSE}
+## load libraries caret, randomForest, rpart, ggplot2, lattice
+library(caret); library(randomForest); library(rpart); library(rpart.plot); library(ggplot2); library(lattice);
+
 ```
 
-## Including Plots
+## Load the Training and Test data sets
 
-You can also embed plots, for example:
+```{r loadData}
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+training <- read.csv("pml-training.csv", na.strings=c("NA","#DIV/0!", ""))
+testingSet <- read.csv("pml-testing.csv", na.strings=c("NA","#DIV/0!", ""))
+
+## exploratory data analysis
+dim(training)
+dim(testingSet)
+
+## remove unnecesary columns
+training <- training[, -c(1:7)]
+testingSet <- testingSet[, -c(1:7)]
+
+## remove columns with empty values
+training<-training[,colSums(is.na(training)) == 0]
+testingSet <-testingSet[,colSums(is.na(testingSet)) == 0]
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+## Data Partition
+
+```{r partitionData}
+## split the training set 75-25 into a new training set and a validation set
+
+trainPartition <- createDataPartition(y = training$classe, p=0.75, list=FALSE)
+trainingSet <- training[trainPartition, ] 
+validationSet <- training[-trainPartition, ]
+
+## plot the variable "classe" from the training set
+plot(trainingSet$classe, col = "maroon", main = "Classe variable in the training set", xlab = "Classe variable", ylab = "Frequency")
+```
+
+
+## Random Forest Model
+
+``` {r forest}
+## set a seed for reproducibility
+set.seed(86667)
+
+forestModel <- randomForest(classe ~. , data = trainingSet, method="class")
+
+forestPrediction <- predict(forestModel, validationSet, type = "class")
+
+```
+
+## Test Results and Confusion Matrix
+``` {r testResults1}
+confusionMatrix(forestPrediction, validationSet$classe)
+```
+
+## Decision Tree Model
+
+``` {r treeModel}
+
+treeModel <- rpart(classe ~ ., data = trainingSet, method = "class")
+
+treePrediction <- predict(treeModel, validationSet, type = "class")
+
+rpart.plot(treeModel, main = "Decision Tree", extra = 106, under=TRUE, faclen=0)
+```
+
+
+## Test Results and Confusion Matrix
+
+``` {r testResults2}
+confusionMatrix(treePrediction, validationSet$classe)
+```
+
+## Final Result
+The Random Forest algorithm had a higher accuracy than the Decision Tree Model, and we'll use it on the testing data set.
+
+```{r final}
+finalPrediction <- predict(forestModel, testingSet, type = "class")
+finalPrediction
+```
